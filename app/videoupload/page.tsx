@@ -60,7 +60,6 @@ export default function VideoUpload() {
     }
   }, [])
 
-  // const handleSubmit = async (e: React.FormEvent) => {
   //   e.preventDefault()
 
   //   if (!video) {

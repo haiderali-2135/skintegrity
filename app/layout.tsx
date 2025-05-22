@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Skintegrity - Deepfake Detection",
   description: "Advanced deepfake detection powered by AI",
-    generator: 'v0.dev'
+    generator: 'Haider'
 }
 
 export default function RootLayout({
@@ -17,11 +17,18 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
+    <>
+    <Header />
     <html lang="en">
       <body className={inter.className}>{children}</body>
-    </html>
+      <Footer />
+      </html>
+      </>
   )
 }
 
 
 import './globals.css'
+import Header from "@/components/Header"
+import Footer from "@/components/Footer"
+

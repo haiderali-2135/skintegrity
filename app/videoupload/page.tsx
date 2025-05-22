@@ -9,24 +9,23 @@ import { supabase } from "@/lib/supabaseClient"
 
 export default function VideoUpload() {
   const [video, setVideo] = useState<File | null>(null)
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [result, setResult] = useState<{
-    classification: string
-    confidence: number
-    detectedAreas: string[]
-  } | null>(null)
+  const [classification, setClassification] = useState<string | null>(null)
+  const [confidence, setConfidence] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
 
+  // Helper to check if we have a successful result
+  const hasResult = classification !== null && confidence !== null
+
   const handleVideoChange = (file: File) => {
     if (file) {
       setVideo(file)
-      setResult(null)
+      setClassification(null)
+      setConfidence(null)
       setError(null)
 
       // Create video preview URL
@@ -60,207 +59,114 @@ export default function VideoUpload() {
     }
   }, [])
 
-  const pollResult = async (url: string, interval = 8000, timeout = 600000) => {
-  const startTime = Date.now();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    console.log("[UI] handleSubmit start")
 
-  while (Date.now() - startTime < timeout) {
+    if (!video) {
+      setError("Please select a video to upload.")
+      return
+    }
+
+    setIsLoading(true)
+    setClassification(null)
+    setConfidence(null)
+    setError(null)
+
     try {
-      console.log("sending a request in poll");
-      
-      const response = await fetch(url);
-      if (response.ok) {
-        return await response.json();
+      const filePath = `skintegrityvideos/${video.name}`
+      console.log("[UI] Uploading to Supabase:", filePath)
+
+      const { error: uploadError } = await supabase
+        .storage
+        .from("videos")
+        .upload(filePath, video, { cacheControl: "3600", upsert: true })
+
+      if (uploadError) {
+        console.error("[UI] Supabase upload error:", uploadError)
+        setError("Failed to upload video to Supabase.")
+        return
       }
-    } catch (error) {
-      console.error("Polling error:", error);
-    }
-    await new Promise(resolve => setTimeout(resolve, interval));
-  }
 
-  throw new Error("Polling timed out.");
-  };
+      const { data } = supabase.storage.from("videos").getPublicUrl(filePath)
+      console.log("[UI] Supabase public URL:", data)
 
-//   const handleSubmit = async (e: React.FormEvent) => {
-//     e.preventDefault();
-  
-//     if (!video) {
-//       setError("Please select a video to upload.");
-//       return;
-//     }
-  
-//     setIsLoading(true);
-//     setResult(null);
-//     setError(null);
-  
-//     try {
-//       const filePath = `skintegrityvideos/${video.name}`;
+      if (!data?.publicUrl) {
+        setError("Failed to retrieve video URL.")
+        return
+      }
 
-//       // Upload to Supabase Storage
-//       const { error: uploadError } = await supabase
-//         .storage
-//         .from('videos') // Bucket name
-//         .upload(filePath, video, {
-//           cacheControl: '3600',
-//           upsert: true, // Allow overwriting if file with same name exists
-//         });
-  
-//       if (uploadError) {
-//         console.error(uploadError);
-//         setError("Failed to upload video to Supabase.");
-//         return;
-//       }
-  
-//       // Get public URL of uploaded video
-//       const { data } = supabase
-//         .storage
-//         .from('videos')
-//         .getPublicUrl(filePath);
-  
-//       if (!data?.publicUrl) {
-//         setError("Failed to retrieve video URL.");
-//         return;
-//       }
+      console.log("[UI] Calling local API /api/process-video")
+      const response = await fetch("/api/process-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ video_url: data.publicUrl }),
+      })
+      console.log("[UI] API responded with status", response.status)
 
-//       console.log("public url",data.publicUrl);
-//       setVideoUrl(data.publicUrl);
-  
-//       // Simulate video analysis (you can replace this with a real API call)
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error("[UI] API error body:", errText)
+        setError(`API error: ${errText}`)
+      } else {
+        const result = await response.json()
 
-//       console.log("public url", data.publicUrl);
-// setVideoUrl(data.publicUrl);
+        if (result.status === 'error') {
+          console.log("------------- error detected -------------")
+          console.error("[UI] Backend error:", result.message)
+          setError("An unexpected error occurred.")
+        } else if (result.status === 'success') {
+          setClassification(result.prediction)
+          setConfidence(result.confidence)
+        } else {
+          setError("Unexpected response format from server.")
+        }
+      }
 
-// // Call your Modal API
-//   const controller = new AbortController();
-//   const timeoutId = setTimeout(() => controller.abort(), 1200_000);
+    } catch (err) {
+      console.error("[UI] Unexpected error:", err)
+      setError("An unexpected error occurred.")
+    } finally {
+      setIsLoading(false)
+      console.log("[UI] Deleting video from Supabase")
+      const { error: delError } = await supabase
+        .storage
+        .from("videos")
+        .remove([`skintegrityvideos/${video.name}`])
 
-//     let modalResponse;
-//     try {
-//       modalResponse = await fetch("https://haiderali-2135--video-processing-app-run-process-video.modal.run", {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({ video_url: data.publicUrl }),
-//         signal: controller.signal,
-//       });
-//     } catch (err: any) {
-//       if (err.name === 'AbortError') {
-//         setError("Request timed out. Try a shorter video or wait longer.");
-//         return;
-//       }
-//       throw err;
-//     } finally {
-//       clearTimeout(timeoutId);
-//     }
-
-//       const modalResult = await modalResponse.json();
-//       console.log("Modal response:", modalResult);
-
-
-//     } catch (error) {
-//       console.error(error);
-//       setError("An unexpected error occurred.");
-//     } finally {
-//       setIsLoading(false);
-      
-//       const { data, error } = await supabase.storage
-//           .from("videos")
-//           .remove([`skintegrityvideos/${video.name}`]);
-
-// if (error) {
-//   console.error("Error deleting video:", error);
-//   setError("Failed to delete video.");
-// } else {
-//   console.log("Video deleted successfully:", data);
-//   setVideoUrl(null); // optionally clear the video URL from state
-// }
-//     }
-//   };
-  
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  console.log("[UI] handleSubmit start");
-
-  if (!video) {
-    setError("Please select a video to upload.");
-    return;
-  }
-
-  setIsLoading(true);
-  setResult(null);
-  setError(null);
-
-  try {
-    const filePath = `skintegrityvideos/${video.name}`;
-    console.log("[UI] Uploading to Supabase:", filePath);
-
-    const { error: uploadError } = await supabase
-      .storage
-      .from("videos")
-      .upload(filePath, video, { cacheControl: "3600", upsert: true });
-
-    if (uploadError) {
-      console.error("[UI] Supabase upload error:", uploadError);
-      setError("Failed to upload video to Supabase.");
-      return;
-    }
-
-    const { data } = supabase.storage.from("videos").getPublicUrl(filePath);
-    console.log("[UI] Supabase public URL:", data);
-
-    if (!data?.publicUrl) {
-      setError("Failed to retrieve video URL.");
-      return;
-    }
-    setVideoUrl(data.publicUrl);
-
-    console.log("[UI] Calling local API /api/process-video");
-    const response = await fetch("/api/process-video", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ video_url: data.publicUrl }),
-    });
-    console.log("[UI] API responded with status", response.status);
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("[UI] API error body:", errText);
-      setError(`API error: ${errText}`);
-    } else {
-      const json = await response.json();
-      console.log("[UI] Got result:", json);
-      // setResult(json);
-    }
-
-  } catch (err) {
-    console.error("[UI] Unexpected error:", err);
-    setError("An unexpected error occurred.");
-  } finally {
-    setIsLoading(false);
-    console.log("[UI] Deleting video from Supabase");
-    const { error: delError } = await supabase
-      .storage
-      .from("videos")
-      .remove([`skintegrityvideos/${video.name}`]);
-
-    if (delError) {
-      console.error("[UI] Supabase delete error:", delError);
-      setError("Failed to delete video.");
-    } else {
-      console.log("[UI] Video deleted successfully");
-      setVideoUrl(null);
+      if (delError) {
+        console.error("[UI] Supabase delete error:", delError)
+        // Don't overwrite existing errors with deletion errors
+        if (!error) {
+          setError("Failed to delete video.")
+        }
+      } else {
+        console.log("[UI] Video deleted successfully")
+      }
     }
   }
-};
 
-
-  
   const resetForm = () => {
     setVideo(null)
     setVideoPreview(null)
-    setResult(null)
+    setClassification(null)
+    setConfidence(null)
     setError(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
+    // Clean up video preview URL to prevent memory leaks
+    if (videoPreview) {
+      URL.revokeObjectURL(videoPreview)
+    }
+  }
+
+  // Format file size helper
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(2)} KB`
+    }
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
   }
 
   return (
@@ -275,13 +181,13 @@ const handleSubmit = async (e: React.FormEvent) => {
         </Link>
 
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">Skintegrity Scanner</h1>
+          <h1 className="text-3xl md:text-4xl font-bold mb-2 text-red-600 dark:text-red-400">Skintegrity Scanner</h1>
           <p className="text-gray-600 dark:text-gray-400 mb-8">
             Upload a video to analyze for potential deepfake manipulation
           </p>
 
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl overflow-hidden">
-            {!result ? (
+            {!hasResult ? (
               <div className="p-6 md:p-8">
                 <form onSubmit={handleSubmit}>
                   <div
@@ -369,10 +275,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                         <strong>Filename:</strong> {video?.name}
                       </p>
                       <p>
-                        <strong>Size:</strong>{" "}
-                        {(video?.size || 0) / (1024 * 1024) < 1
-                          ? `${((video?.size || 0) / 1024).toFixed(2)} KB`
-                          : `${((video?.size || 0) / (1024 * 1024)).toFixed(2)} MB`}
+                        <strong>Size:</strong> {video?.size ? formatFileSize(video.size) : 'Unknown'}
                       </p>
                     </div>
                   </div>
@@ -380,19 +283,19 @@ const handleSubmit = async (e: React.FormEvent) => {
                   <div className="md:w-1/2">
                     <div
                       className={`p-6 rounded-lg border ${
-                        result.classification === "REAL"
+                        classification === "REAL"
                           ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
                           : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
                       }`}
                     >
                       <div className="flex items-center mb-4">
-                        {result.classification === "REAL" ? (
+                        {classification === "REAL" ? (
                           <CheckCircle className="text-green-600 mr-3" size={24} />
                         ) : (
                           <AlertCircle className="text-red-600 mr-3" size={24} />
                         )}
-                        <h2 className="text-2xl font-bold text-gray-700">
-                          {result.classification === "REAL" ? "Authentic Video" : "Deepfake Detected"}
+                        <h2 className="text-2xl font-bold text-gray-700 dark:text-gray-200">
+                          {classification === "REAL" ? "Authentic Video" : "Deepfake Detected"}
                         </h2>
                       </div>
 
@@ -401,44 +304,24 @@ const handleSubmit = async (e: React.FormEvent) => {
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
                           <div
                             className={`h-4 rounded-full ${
-                              result.classification === "REAL" ? "bg-green-600" : "bg-red-600"
+                              classification === "REAL" ? "bg-green-600" : "bg-red-600"
                             }`}
-                            style={{ width: `${result.confidence.toFixed(1)}%` }}
+                            style={{ width: `${confidence ? (confidence * 100).toFixed(1) : 0}%` }}
                           ></div>
                         </div>
-                        <p className="text-right text-sm text-gray-700 mt-1">{result.confidence.toFixed(1)}%</p>
+                        <p className="text-right text-sm text-gray-700 dark:text-gray-300 mt-1">
+                          {confidence ? (confidence * 100).toFixed(1) : 0}%
+                        </p>
                       </div>
-
-                      {/* {result.classification !== "REAL" && (
-                        <div>
-                          <p className="font-medium mb-2">Detected Manipulation Areas:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {result.detectedAreas.map((area, index) => (
-                              <span
-                                key={index}
-                                className="bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 px-3 py-1 rounded-full text-sm"
-                              >
-                                {area}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )} */}
                     </div>
 
                     <div className="mt-6 flex flex-col sm:flex-row gap-4">
-                      <button onClick={resetForm} className="btn-outline text-gray-700 flex-1 flex items-center justify-center">
+                      <button 
+                        onClick={resetForm} 
+                        className="btn-outline text-gray-700 dark:text-gray-300 flex-1 flex items-center justify-center"
+                      >
                         Analyze Another Video
                       </button>
-                      {/* <button
-                        onClick={() => {
-                          // In a real app, this would generate and download a report
-                          alert("Report downloaded")
-                        }}
-                        className="btn-primary flex-1 flex items-center justify-center"
-                      >
-                        Download Report
-                      </button> */}
                     </div>
                   </div>
                 </div>
@@ -476,7 +359,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   </div>
                   <h3 className="font-medium mb-2">Result Generation</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Comprehensive report with confidence scores and highlighted areas of concern.
+                     confidence scores calculated by our predicer model
                   </p>
                 </div>
               </div>

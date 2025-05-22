@@ -19,153 +19,40 @@ export default function Home() {
       {/* Circuit pattern background */}
       <div className="circuit-pattern fixed inset-0 z-0"></div>
 
-      {/* Navigation */}
-      <header className="relative z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md">
-        <nav className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2">
-            <span className="text-2xl font-bold">
-              Skin<span className="text-red-600">tegrity</span>
-            </span>
-          </Link>
-
-          {/* Mobile menu button */}
-          <button
-            className="md:hidden"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              {isMenuOpen ? (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              ) : (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 6h16M4 12h16M4 18h16"
-                />
-              )}
-            </svg>
-          </button>
-
-          {/* Desktop navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            <Link href="/about" className="nav-link">
-              About
-            </Link>
-            <Link href="/technology" className="nav-link">
-              Technology
-            </Link>
-            <Link href="/videoupload" className="nav-link">
-              Scanner
-            </Link>
-            <Link href="/contact" className="btn-primary">
-              Contact Us
-            </Link>
-          </div>
-        </nav>
-
-        {/* Mobile menu */}
-        {isMenuOpen && (
-          <div className="md:hidden bg-white dark:bg-gray-900 py-4 px-6">
-            <div className="flex flex-col space-y-4">
-              <Link href="/about" className="nav-link">
-                About
+      {/* Hero Section */}
+      <section className="relative z-10 flex-1 min-h-[calc(100vh-80px)] flex items-center justify-center container mx-auto px-6 py-8">
+        <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-12">
+          <div className="flex-1 max-w-2xl text-center lg:text-left">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6">
+              Detect <span className="gradient-text">Deepfakes</span> with
+              Skintegrity
+            </h1>
+            <p className="text-lg md:text-xl mb-6 md:mb-8 text-gray-700 dark:text-gray-300">
+              Our cutting-edge technology analyzes facial patterns and digital
+              artifacts to identify synthetically manipulated videos with high
+              accuracy.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+              <Link href="/videoupload" className="btn-primary text-center">
+                Try Scanner Now
               </Link>
-              <Link href="/technology" className="nav-link">
-                Technology
-              </Link>
-              <Link href="/videoupload" className="nav-link">
-                Scanner
-              </Link>
-              <Link
-                href="/contact"
-                className="btn-primary inline-block text-center"
-              >
-                Contact Us
+              <Link href="/technology" className="btn-outline text-center hover:text-gray-900">
+                Learn More
               </Link>
             </div>
           </div>
-        )}
-      </header>
 
-      {/* Hero Section
-      <section className="relative z-10 flex-1 container mx-auto px-6 py-12 md:py-24 flex flex-col md:flex-row items-center">
-        <div className="md:w-1/2 mb-12 md:mb-0">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
-            Detect <span className="gradient-text">Deepfakes</span> with
-            Skintegrity
-          </h1>
-          <p className="text-lg md:text-xl mb-8 text-gray-700 dark:text-gray-300 max-w-lg">
-            Our cutting-edge technology analyzes facial patterns and digital
-            artifacts to identify synthetically manipulated videos with high
-            accuracy.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Link href="/videoupload" className="btn-primary text-center">
-              Try Scanner Now
-            </Link>
-            <Link href="/technology" className="btn-outline text-center">
-              Learn More
-            </Link>
-          </div>
-        </div>
-
-        <div className="md:w-1/2 relative">
-          <div className="relative w-full max-w-md mx-auto">
-            <Image
-              src="/images/facial-analysis.png"
-              alt="AI facial analysis visualization"
-              width={300}
-              height={300}
-              className="rounded-lg shadow-2xl"
-              priority
-            />
-          </div>
-        </div>
-      </section> */}
-
-      {/* Hero Section */}
-      <section className="relative z-10 min-h-[500px] md:min-h-screen max-h-screen container mx-auto px-6 py-8 md:py-0 flex flex-col md:flex-row items-center justify-center overflow-hidden">
-        <div className="md:w-1/2 mb-8 md:mb-0">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6">
-            Detect <span className="gradient-text">Deepfakes</span> with
-            Skintegrity
-          </h1>
-          <p className="text-lg md:text-xl mb-6 md:mb-8 text-gray-700 dark:text-gray-300 max-w-lg">
-            Our cutting-edge technology analyzes facial patterns and digital
-            artifacts to identify synthetically manipulated videos with high
-            accuracy.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Link href="/videoupload" className="btn-primary text-center">
-              Try Scanner Now
-            </Link>
-            <Link href="/technology" className="btn-outline text-center">
-              Learn More
-            </Link>
-          </div>
-        </div>
-
-        <div className="md:w-1/2 relative flex justify-center items-center">
-          <div className="relative w-full flex justify-center">
-            <Image
-              src="/images/facial-analysis.png"
-              alt="AI facial analysis visualization"
-              width={300}
-              height={300}
-              className="rounded-lg shadow-2xl object-contain md:max-h-[70vh]"
-              priority
-            />
+          <div className="flex-1 max-w-md lg:max-w-lg flex justify-center items-center">
+            <div className="relative w-full flex justify-center">
+              <Image
+                src="/images/facial-analysis.png"
+                alt="AI facial analysis visualization"
+                width={400}
+                height={400}
+                className="rounded-lg shadow-2xl object-contain w-full h-auto max-w-[300px] md:max-w-[400px]"
+                priority
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -182,7 +69,7 @@ export default function Home() {
               <div className="bg-red-100 dark:bg-red-900/30 p-3 rounded-full w-12 h-12 flex items-center justify-center mb-4">
                 <Upload className="text-red-600" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Upload Video</h3>
+              <h3 className="text-xl font-bold mb-2 text-red-600">Upload Video</h3>
               <p className="text-gray-600 dark:text-gray-400">
                 Upload any suspicious video file to our secure platform for
                 analysis.
@@ -193,7 +80,7 @@ export default function Home() {
               <div className="bg-red-100 dark:bg-red-900/30 p-3 rounded-full w-12 h-12 flex items-center justify-center mb-4">
                 <Shield className="text-red-600" />
               </div>
-              <h3 className="text-xl font-bold mb-2">AI Analysis</h3>
+              <h3 className="text-xl font-bold mb-2 text-red-600">AI Analysis</h3>
               <p className="text-gray-600 dark:text-gray-400">
                 Our advanced AI scans for digital artifacts and inconsistencies
                 in facial patterns.
@@ -204,10 +91,9 @@ export default function Home() {
               <div className="bg-red-100 dark:bg-red-900/30 p-3 rounded-full w-12 h-12 flex items-center justify-center mb-4">
                 <AlertTriangle className="text-red-600" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Get Results</h3>
+              <h3 className="text-xl font-bold mb-2 text-red-600">Get Results</h3>
               <p className="text-gray-600 dark:text-gray-400">
-                Receive a detailed report with confidence scores and highlighted
-                areas of concern.
+                Receiveconfidence scores calculated by our model.
               </p>
             </div>
           </div>
@@ -253,42 +139,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="relative z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md py-8">
-        <div className="container mx-auto px-6">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="mb-4 md:mb-0">
-              <span className="text-xl font-bold">
-                Skin<span className="text-red-600">tegrity</span>
-              </span>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                © {new Date().getFullYear()} Skintegrity. All rights reserved.
-              </p>
-            </div>
-            <div className="flex space-x-6">
-              <Link
-                href="/privacy"
-                className="text-sm text-gray-600 dark:text-gray-400 hover:text-red-600"
-              >
-                Privacy Policy
-              </Link>
-              <Link
-                href="/terms"
-                className="text-sm text-gray-600 dark:text-gray-400 hover:text-red-600"
-              >
-                Terms of Service
-              </Link>
-              <Link
-                href="/contact"
-                className="text-sm text-gray-600 dark:text-gray-400 hover:text-red-600"
-              >
-                Contact
-              </Link>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

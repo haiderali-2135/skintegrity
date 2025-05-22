@@ -60,178 +60,198 @@ export default function VideoUpload() {
     }
   }, [])
 
-  //   e.preventDefault()
+  const pollResult = async (url: string, interval = 8000, timeout = 600000) => {
+  const startTime = Date.now();
 
-  //   if (!video) {
-  //     setError("Please select a video to upload.")
-  //     return
-  //   }
+  while (Date.now() - startTime < timeout) {
+    try {
+      console.log("sending a request in poll");
+      
+      const response = await fetch(url);
+      if (response.ok) {
+        return await response.json();
+      }
+    } catch (error) {
+      console.error("Polling error:", error);
+    }
+    await new Promise(resolve => setTimeout(resolve, interval));
+  }
 
-  //   const formData = new FormData()
-  //   formData.append("file", video)
+  throw new Error("Polling timed out.");
+  };
 
-  //   setIsLoading(true)
-  //   setResult(null)
-  //   setError(null)
+//   const handleSubmit = async (e: React.FormEvent) => {
+//     e.preventDefault();
+  
+//     if (!video) {
+//       setError("Please select a video to upload.");
+//       return;
+//     }
+  
+//     setIsLoading(true);
+//     setResult(null);
+//     setError(null);
+  
+//     try {
+//       const filePath = `skintegrityvideos/${video.name}`;
 
-  //   try {
-  //     // Simulate API call with a timeout
-  //     await new Promise((resolve) => setTimeout(resolve, 3000))
+//       // Upload to Supabase Storage
+//       const { error: uploadError } = await supabase
+//         .storage
+//         .from('videos') // Bucket name
+//         .upload(filePath, video, {
+//           cacheControl: '3600',
+//           upsert: true, // Allow overwriting if file with same name exists
+//         });
+  
+//       if (uploadError) {
+//         console.error(uploadError);
+//         setError("Failed to upload video to Supabase.");
+//         return;
+//       }
+  
+//       // Get public URL of uploaded video
+//       const { data } = supabase
+//         .storage
+//         .from('videos')
+//         .getPublicUrl(filePath);
+  
+//       if (!data?.publicUrl) {
+//         setError("Failed to retrieve video URL.");
+//         return;
+//       }
 
-  //     // Mock response - in a real app, this would be from your API
-  //     const mockResult = {
-  //       classification: Math.random() > 0.5 ? "REAL" : "DEEPFAKE",
-  //       confidence: Math.random() * 100,
-  //       detectedAreas: ["face", "mouth", "eyes"],
-  //     }
+//       console.log("public url",data.publicUrl);
+//       setVideoUrl(data.publicUrl);
+  
+//       // Simulate video analysis (you can replace this with a real API call)
 
-  //     setResult(mockResult)
-  //   } catch (error) {
-  //     setError("Error uploading or processing video. Please try again.")
-  //   } finally {
-  //     setIsLoading(false)
-  //   }
-  // }
+//       console.log("public url", data.publicUrl);
+// setVideoUrl(data.publicUrl);
 
-  // const handleSubmit = async (e: React.FormEvent) => {
-  //   e.preventDefault();
-  
-  //   if (!video) {
-  //     setError("Please select a video to upload.");
-  //     return;
-  //   }
-  
-  //   setIsLoading(true);
-  //   setResult(null);
-  //   setError(null);
-  
-  //   try {
-  //     const fileExt = video.name.split('.').pop();
-  //     const fileName = `${Date.now()}.${fileExt}`;
-  //     const filePath = `videos/${fileName}`;
-  
-  //     // Upload to Supabase
-  //     const { error: uploadError } = await supabase
-  //       .storage
-  //       .from('')
-  //       .upload(filePath, video, {
-  //         cacheControl: '3600',
-  //         upsert: false,
-  //       });
-  
-  //     if (uploadError) {
-  //       console.error(uploadError);
-  //       setError("Failed to upload video to Supabase.");
-  //       return;
-  //     }
-  
-  //     // Get public URL
-  //     const { data } = supabase
-  //       .storage
-  //       .from('your-bucket-name')
-  //       .getPublicUrl(filePath);
-  
-  //     if (!data?.publicUrl) {
-  //       setError("Failed to get video URL.");
-  //       return;
-  //     }
-  
-  //     setVideoUrl(data.publicUrl);
-  
-  //     // MOCK API CALL (you can replace this with your actual backend call)
-  //     await new Promise((resolve) => setTimeout(resolve, 3000));
-  
-  //     const mockResult = {
-  //       classification: Math.random() > 0.5 ? "REAL" : "DEEPFAKE",
-  //       confidence: Math.random() * 100,
-  //       detectedAreas: ["face", "mouth", "eyes"],
-  //     };
-  
-  //     setResult(mockResult);
-  //   } catch (error) {
-  //     console.error(error);
-  //     setError("Error uploading or processing video.");
-  //   } finally {
-  //     setIsLoading(false);
-  //   }
-  // };
+// // Call your Modal API
+//   const controller = new AbortController();
+//   const timeoutId = setTimeout(() => controller.abort(), 1200_000);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+//     let modalResponse;
+//     try {
+//       modalResponse = await fetch("https://haiderali-2135--video-processing-app-run-process-video.modal.run", {
+//         method: "POST",
+//         headers: { "Content-Type": "application/json" },
+//         body: JSON.stringify({ video_url: data.publicUrl }),
+//         signal: controller.signal,
+//       });
+//     } catch (err: any) {
+//       if (err.name === 'AbortError') {
+//         setError("Request timed out. Try a shorter video or wait longer.");
+//         return;
+//       }
+//       throw err;
+//     } finally {
+//       clearTimeout(timeoutId);
+//     }
+
+//       const modalResult = await modalResponse.json();
+//       console.log("Modal response:", modalResult);
+
+
+//     } catch (error) {
+//       console.error(error);
+//       setError("An unexpected error occurred.");
+//     } finally {
+//       setIsLoading(false);
+      
+//       const { data, error } = await supabase.storage
+//           .from("videos")
+//           .remove([`skintegrityvideos/${video.name}`]);
+
+// if (error) {
+//   console.error("Error deleting video:", error);
+//   setError("Failed to delete video.");
+// } else {
+//   console.log("Video deleted successfully:", data);
+//   setVideoUrl(null); // optionally clear the video URL from state
+// }
+//     }
+//   };
   
-    if (!video) {
-      setError("Please select a video to upload.");
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  console.log("[UI] handleSubmit start");
+
+  if (!video) {
+    setError("Please select a video to upload.");
+    return;
+  }
+
+  setIsLoading(true);
+  setResult(null);
+  setError(null);
+
+  try {
+    const filePath = `skintegrityvideos/${video.name}`;
+    console.log("[UI] Uploading to Supabase:", filePath);
+
+    const { error: uploadError } = await supabase
+      .storage
+      .from("videos")
+      .upload(filePath, video, { cacheControl: "3600", upsert: true });
+
+    if (uploadError) {
+      console.error("[UI] Supabase upload error:", uploadError);
+      setError("Failed to upload video to Supabase.");
       return;
     }
-  
-    setIsLoading(true);
-    setResult(null);
-    setError(null);
-  
-    try {
-      const filePath = `skintegrityvideos/${video.name}`;
 
-    
-  
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase
-        .storage
-        .from('videos') // Bucket name
-        .upload(filePath, video, {
-          cacheControl: '3600',
-          upsert: true, // Allow overwriting if file with same name exists
-        });
-  
-      if (uploadError) {
-        console.error(uploadError);
-        setError("Failed to upload video to Supabase.");
-        return;
-      }
-  
-      // Get public URL of uploaded video
-      const { data } = supabase
-        .storage
-        .from('videos')
-        .getPublicUrl(filePath);
-  
-      if (!data?.publicUrl) {
-        setError("Failed to retrieve video URL.");
-        return;
-      }
+    const { data } = supabase.storage.from("videos").getPublicUrl(filePath);
+    console.log("[UI] Supabase public URL:", data);
 
-      console.log("public url",data.publicUrl);
-      setVideoUrl(data.publicUrl);
-  
-      // Simulate video analysis (you can replace this with a real API call)
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-  
-      const mockResult = {
-        classification: Math.random() > 0.5 ? "REAL" : "DEEPFAKE",
-        confidence: Math.random() * 100,
-        detectedAreas: ["face", "mouth", "eyes"],
-      };
-  
-      setResult(mockResult);
-    } catch (error) {
-      console.error(error);
-      setError("An unexpected error occurred.");
-    } finally {
-      setIsLoading(false);
-      //deleting video from the bucket
-      const { data, error } = await supabase.storage
-  .from("videos")
-  .remove([`skintegrityvideos/${video.name}`]);
-
-if (error) {
-  console.error("Error deleting video:", error);
-  setError("Failed to delete video.");
-} else {
-  console.log("Video deleted successfully:", data);
-  setVideoUrl(null); // optionally clear the video URL from state
-}
+    if (!data?.publicUrl) {
+      setError("Failed to retrieve video URL.");
+      return;
     }
-  };
-  
+    setVideoUrl(data.publicUrl);
+
+    console.log("[UI] Calling local API /api/process-video");
+    const response = await fetch("/api/process-video", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ video_url: data.publicUrl }),
+    });
+    console.log("[UI] API responded with status", response.status);
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("[UI] API error body:", errText);
+      setError(`API error: ${errText}`);
+    } else {
+      const json = await response.json();
+      console.log("[UI] Got result:", json);
+      // setResult(json);
+    }
+
+  } catch (err) {
+    console.error("[UI] Unexpected error:", err);
+    setError("An unexpected error occurred.");
+  } finally {
+    setIsLoading(false);
+    console.log("[UI] Deleting video from Supabase");
+    const { error: delError } = await supabase
+      .storage
+      .from("videos")
+      .remove([`skintegrityvideos/${video.name}`]);
+
+    if (delError) {
+      console.error("[UI] Supabase delete error:", delError);
+      setError("Failed to delete video.");
+    } else {
+      console.log("[UI] Video deleted successfully");
+      setVideoUrl(null);
+    }
+  }
+};
+
+
   
   const resetForm = () => {
     setVideo(null)

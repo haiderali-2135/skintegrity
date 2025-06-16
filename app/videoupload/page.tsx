@@ -18,7 +18,7 @@ export default function VideoUpload() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
 
-  
+  // Helper to check if we have a successful result
   const hasResult = classification !== null && confidence !== null
 
   const handleVideoChange = (file: File) => {
@@ -169,42 +169,6 @@ export default function VideoUpload() {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
   }
 
-
-  const VideoContainer = ({ src, controls = false, showCloseButton = false, onClose }: {
-    src: string
-    controls?: boolean
-    showCloseButton?: boolean
-    onClose?: () => void
-  }) => (
-    <div className="relative w-full flex justify-center">
-      <div className="relative max-w-full max-h-96 bg-black rounded-lg overflow-hidden">
-        <video
-          ref={controls ? videoRef : undefined}
-          src={src}
-          className="w-full h-full max-w-none"
-          controls={controls}
-          style={{ 
-            maxHeight: '24rem', // max-h-96 equivalent
-            width: 'auto',
-            height: 'auto'
-          }}
-        />
-        {showCloseButton && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onClose?.()
-            }}
-            className="absolute top-2 right-2 bg-black/70 text-white p-1 rounded-full hover:bg-black/90 transition-colors"
-          >
-            <X size={16} />
-          </button>
-        )}
-      </div>
-    </div>
-  )
-
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Circuit pattern background */}
@@ -234,13 +198,25 @@ export default function VideoUpload() {
                     onClick={() => fileInputRef.current?.click()}
                   >
                     {videoPreview ? (
-                      <div className="w-full space-y-4">
-                        <VideoContainer 
-                          src={videoPreview} 
-                          controls={true}
-                          showCloseButton={true}
-                          onClose={resetForm}
-                        />
+                      <div className="w-full">
+                        <div className="relative aspect-video w-full max-w-lg mx-auto mb-4">
+                          <video
+                            ref={videoRef}
+                            src={videoPreview}
+                            className="w-full h-full rounded-lg object-cover"
+                            controls
+                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              resetForm()
+                            }}
+                            className="absolute top-2 right-2 bg-black/70 text-white p-1 rounded-full"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
                         <p className="text-green-600 dark:text-green-400 text-center font-medium">{video?.name}</p>
                       </div>
                     ) : (
@@ -287,14 +263,14 @@ export default function VideoUpload() {
               </div>
             ) : (
               <div className="p-6 md:p-8">
-                <div className="flex flex-col lg:flex-row gap-8">
-                  <div className="lg:w-1/2">
+                <div className="flex flex-col md:flex-row gap-8">
+                  <div className="md:w-1/2">
                     {videoPreview && (
-                      <div className="mb-4">
-                        <VideoContainer src={videoPreview} controls={true} />
+                      <div className="aspect-video w-full mb-4">
+                        <video src={videoPreview} className="w-full h-full rounded-lg object-cover" controls />
                       </div>
                     )}
-                    <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
                       <p>
                         <strong>Filename:</strong> {video?.name}
                       </p>
@@ -304,7 +280,7 @@ export default function VideoUpload() {
                     </div>
                   </div>
 
-                  <div className="lg:w-1/2">
+                  <div className="md:w-1/2">
                     <div
                       className={`p-6 rounded-lg border ${
                         classification === "REAL"
@@ -327,7 +303,7 @@ export default function VideoUpload() {
                         <p className="text-gray-700 dark:text-gray-300 mb-2">Confidence Score:</p>
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
                           <div
-                            className={`h-4 rounded-full transition-all duration-300 ${
+                            className={`h-4 rounded-full ${
                               classification === "REAL" ? "bg-green-600" : "bg-red-600"
                             }`}
                             style={{ width: `${confidence ? (confidence * 100).toFixed(1) : 0}%` }}
@@ -383,7 +359,7 @@ export default function VideoUpload() {
                   </div>
                   <h3 className="font-medium mb-2">Result Generation</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Confidence scores calculated by our predictor model
+                     confidence scores calculated by our predicer model
                   </p>
                 </div>
               </div>

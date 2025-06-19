@@ -60,7 +60,7 @@ export default function Home() {
       {/* Features Section */}
       <section className="relative z-10 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md py-16">
         <div className="container mx-auto px-6">
-          <h2 className="text-3xl font-bold text-center mb-12">
+          <h2 className="text-3xl font-bold text-center mb-12 text-gray-600">
             How Skintegrity Works
           </h2>
 

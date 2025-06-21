@@ -1,11 +1,9 @@
 import { NextResponse } from "next/server";
 
-// ADD THIS LINE
-export const maxDuration = 60;
-
 export async function POST(req: Request) {
   console.log("[API] Received POST /api/process-video");
   let body: any;
+  
   try {
     body = await req.json();
   } catch (e) {
@@ -30,60 +28,42 @@ export async function POST(req: Request) {
         redirect: "manual",
       }
     );
+    
     console.log("[API] Modal status:", modalResponse.status);
 
     if (modalResponse.status === 303) {
       const resultUrl = modalResponse.headers.get("Location");
       console.log("[API] Poll URL:", resultUrl);
+      
       if (!resultUrl) {
         return NextResponse.json({ error: "No Location header on redirect" }, { status: 500 });
       }
 
-      // UPDATED POLLING FUNCTION - This is the key fix
-      const poll = async (url: string, interval = 3000, maxTime = 50000) => {
-        const startTime = Date.now();
-        let attempt = 0;
-        
-        while (Date.now() - startTime < maxTime) {
-          attempt++;
-          console.log(`[API] Poll attempt ${attempt}, elapsed: ${Date.now() - startTime}ms`);
-          
-          try {
-            const r = await fetch(url);
-            if (r.ok) return r.json();
-          } catch (error) {
-            console.error(`[API] Poll attempt ${attempt} failed:`, error);
-          }
-          
-          // Check if we're close to timeout
-          if (Date.now() - startTime > maxTime - 5000) {
-            throw new Error("Approaching serverless function timeout limit");
-          }
-          
-          await new Promise((res) => setTimeout(res, interval));
-        }
-        
-        throw new Error("Polling timed out within serverless limits");
-      };
+      // Return the poll URL to the client instead of polling server-side
+      return NextResponse.json({ 
+        status: "processing", 
+        poll_url: resultUrl,
+        message: "Video processing started. Use the poll_url to check status."
+      }, { status: 202 });
+    }
 
-      const result = await poll(resultUrl);
-      console.log("[API] Poll result:", result);
-      return NextResponse.json(result, { status: 200 });
+    // Handle immediate response
+    if (!modalResponse.ok) {
+      const errorText = await modalResponse.text();
+      console.error("[API] Modal error:", errorText);
+      return NextResponse.json({ 
+        error: `Modal service error: ${errorText}` 
+      }, { status: modalResponse.status });
     }
 
     const data = await modalResponse.json();
     console.log("[API] Immediate result:", data);
-    return NextResponse.json(data, { status: modalResponse.status });
+    return NextResponse.json(data, { status: 200 });
+
   } catch (err: any) {
     console.error("[API] Error:", err);
-    
-    // Better error message for timeout
-    if (err.message.includes('timeout')) {
-      return NextResponse.json({ 
-        error: "Video processing is taking too long. Please try with a shorter video." 
-      }, { status: 408 });
-    }
-    
-    return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
+    return NextResponse.json({ 
+      error: err.message || "Server error" 
+    }, { status: 500 });
   }
 }

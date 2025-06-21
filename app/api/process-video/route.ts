@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+// ADD THIS LINE
+export const maxDuration = 60;
+
 export async function POST(req: Request) {
   console.log("[API] Received POST /api/process-video");
   let body: any;
@@ -36,15 +39,31 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "No Location header on redirect" }, { status: 500 });
       }
 
-      // Poll until ready
-      const poll = async (url: string, interval = 5000, maxAttempts = 120) => {
-        for (let i = 0; i < maxAttempts; i++) {
-          console.log(`[API] Poll attempt ${i + 1}`);
-          const r = await fetch(url);
-          if (r.ok) return r.json();
+      // UPDATED POLLING FUNCTION - This is the key fix
+      const poll = async (url: string, interval = 3000, maxTime = 50000) => {
+        const startTime = Date.now();
+        let attempt = 0;
+        
+        while (Date.now() - startTime < maxTime) {
+          attempt++;
+          console.log(`[API] Poll attempt ${attempt}, elapsed: ${Date.now() - startTime}ms`);
+          
+          try {
+            const r = await fetch(url);
+            if (r.ok) return r.json();
+          } catch (error) {
+            console.error(`[API] Poll attempt ${attempt} failed:`, error);
+          }
+          
+          // Check if we're close to timeout
+          if (Date.now() - startTime > maxTime - 5000) {
+            throw new Error("Approaching serverless function timeout limit");
+          }
+          
           await new Promise((res) => setTimeout(res, interval));
         }
-        throw new Error("Polling timed out");
+        
+        throw new Error("Polling timed out within serverless limits");
       };
 
       const result = await poll(resultUrl);
@@ -57,8 +76,14 @@ export async function POST(req: Request) {
     return NextResponse.json(data, { status: modalResponse.status });
   } catch (err: any) {
     console.error("[API] Error:", err);
+    
+    // Better error message for timeout
+    if (err.message.includes('timeout')) {
+      return NextResponse.json({ 
+        error: "Video processing is taking too long. Please try with a shorter video." 
+      }, { status: 408 });
+    }
+    
     return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
   }
 }
-
-// You can also handle GET, PUT, DELETE, etc. by exporting those functions by name

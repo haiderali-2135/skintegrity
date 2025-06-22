@@ -96,12 +96,51 @@ export default function VideoUpload() {
         return
       }
 
-      console.log("[UI] Calling local API /api/process-video")
-      const response = await fetch("/api/process-video", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ video_url: data.publicUrl }),
-      })
+      console.log("[UI] Calling local API /api/process-video");
+const response = await fetch("/api/process-video", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ video_url: data.publicUrl }),
+});
+
+if (!response.ok) {
+  const errText = await response.text();
+  console.error("[UI] API error body:", errText);
+  setError(`API error: ${errText}`);
+  return;
+}
+
+const { poll_url, prediction, confidence, status } = await response.json();
+
+// If result is returned immediately
+if (status === "success") {
+  setClassification(prediction);
+  setConfidence(confidence);
+  return;
+}
+
+if (!poll_url) {
+  setError("No poll URL received from server.");
+  return;
+}
+
+console.log("[UI] Polling for result at:", poll_url);
+
+// Polling loop
+for (let i = 0; i < 120; i++) {
+  const pollRes = await fetch(poll_url);
+  if (pollRes.ok) {
+    const result = await pollRes.json();
+    console.log("[UI] Poll result:", result);
+    setClassification(result.prediction);
+    setConfidence(result.confidence);
+    return;
+  }
+  await new Promise((res) => setTimeout(res, 5000));
+}
+
+setError("Polling timed out. Try again later.");
+
       console.log("[UI] API responded with status", response.status)
 
       if (!response.ok) {

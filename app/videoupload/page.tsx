@@ -74,29 +74,44 @@ export default function VideoUpload() {
     setError(null)
 
     try {
-      const filePath = `skintegrityvideos/${video.name}`
-      console.log("[UI] Uploading to Supabase:", filePath)
+     // 1. Upload to Supabase
+const filePath = `skintegrityvideos/${video.name}`;
+console.log("[UI] Uploading to Supabase:", filePath);
 
-      const { error: uploadError } = await supabase
-        .storage
-        .from("videos")
-        .upload(filePath, video, { cacheControl: "3600", upsert: true })
+const { error: uploadError } = await supabase
+  .storage
+  .from("videos")
+  .upload(filePath, video, { cacheControl: "3600", upsert: true });
 
-      if (uploadError) {
-        console.error("[UI] Supabase upload error:", uploadError)
-        setError("Failed to upload video to Supabase.")
-        return
-      }
+if (uploadError) {
+  console.error("[UI] Supabase upload error:", uploadError);
+  setError("Failed to upload video to Supabase.");
+  return;
+}
 
-      const { data } = supabase.storage.from("videos").getPublicUrl(filePath)
-      console.log("[UI] Supabase public URL:", data)
+// 2. Get public URL
+const { data } = supabase.storage.from("videos").getPublicUrl(filePath);
+console.log("[UI] Supabase public URL:", data);
 
-      if (!data?.publicUrl) {
-        setError("Failed to retrieve video URL.")
-        return
-      }
+if (!data?.publicUrl) {
+  setError("Failed to retrieve video URL.");
+  return;
+}
 
-      console.log("[UI] Calling local API /api/process-video");
+// 3. Insert row into video_results
+console.log("[UI] Inserting row into video_results");
+const insertRes = await supabase
+  .from("video_results")
+  .insert([{ video_url: data.publicUrl }]);
+
+if (insertRes.error) {
+  console.error("[UI] Supabase insert error:", insertRes.error);
+  setError("Failed to create video result entry.");
+  return;
+}
+
+// 4. Call backend API to trigger Modal
+console.log("[UI] Calling backend API /api/process-video");
 const response = await fetch("/api/process-video", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
@@ -110,38 +125,46 @@ if (!response.ok) {
   return;
 }
 
-const { poll_url, prediction, confidence, status } = await response.json();
+// 5. Start polling Supabase table by video_url
+let pollAttempts = 0;
+const maxAttempts = 120;
+const pollInterval = 5000;
 
-// If result is returned immediately
-if (status === "success") {
-  setClassification(prediction);
-  setConfidence(confidence);
-  return;
-}
+while (pollAttempts < maxAttempts) {
+  pollAttempts++;
 
-if (!poll_url) {
-  setError("No poll URL received from server.");
-  return;
-}
+  const { data: row, error: pollError } = await supabase
+    .from("video_results")
+    .select("status, prediction, confidence")
+    .eq("video_url", data.publicUrl)
+    .maybeSingle();
 
-console.log("[UI] Polling for result at:", poll_url);
-
-// Polling loop
-for (let i = 0; i < 120; i++) {
-  const pollRes = await fetch(poll_url);
-  if (pollRes.ok) {
-    const result = await pollRes.json();
-    console.log("[UI] Poll result:", result);
-    setClassification(result.prediction);
-    setConfidence(result.confidence);
-    return;
+  if (pollError) {
+    console.error("[UI] Supabase poll error:", pollError);
+    setError("Error while polling result.");
+    break;
   }
-  await new Promise((res) => setTimeout(res, 5000));
+
+  if (row?.status === "completed") {
+    console.log("[UI] Video processed:", row);
+    setClassification(row.prediction);
+    setConfidence(row.confidence);
+    break;
+  }
+
+  if (row?.status === "failed") {
+    console.error("[UI] Video processing failed.");
+    setError("Video processing failed.");
+    break;
+  }
+
+  await new Promise((res) => setTimeout(res, pollInterval));
 }
 
-setError("Polling timed out. Try again later.");
+if (pollAttempts >= maxAttempts) {
+  setError("Processing took too long. Try again later.");
+}
 
-      console.log("[UI] API responded with status", response.status)
 
       if (!response.ok) {
         const errText = await response.text()

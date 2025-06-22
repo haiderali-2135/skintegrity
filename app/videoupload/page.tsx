@@ -149,6 +149,9 @@ while (pollAttempts < maxAttempts) {
     console.log("[UI] Video processed:", row);
     setClassification(row.prediction);
     setConfidence(row.confidence);
+
+    await supabase.storage.from("videos").remove([`skintegrityvideos/${video.name}`]);
+    await supabase.from("video_results").delete().eq("video_url", data.publicUrl);
     break;
   }
 

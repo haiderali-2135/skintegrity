@@ -15,13 +15,10 @@ export default function VideoUpload() {
   const [confidence, setConfidence] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [processingStage, setProcessingStage] = useState<string>("")
-  const [pollAttempts, setPollAttempts] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Helper to check if we have a successful result
+  
   const hasResult = classification !== null && confidence !== null
 
   const handleVideoChange = (file: File) => {
@@ -30,8 +27,6 @@ export default function VideoUpload() {
       setClassification(null)
       setConfidence(null)
       setError(null)
-      setProcessingStage("")
-      setPollAttempts(0)
 
       // Create video preview URL
       const videoUrl = URL.createObjectURL(file)
@@ -64,90 +59,6 @@ export default function VideoUpload() {
     }
   }, [])
 
-  // Client-side polling function
-  const pollForResult = async (pollUrl: string) => {
-    const maxAttempts = 60; // 5 minutes max (5 second intervals)
-    const pollInterval = 5000; // 5 seconds
-    
-    setProcessingStage("Processing video frames...")
-    setPollAttempts(0)
-
-    const poll = async () => {
-      try {
-        setPollAttempts(prev => prev + 1)
-        
-        if (pollAttempts >= maxAttempts) {
-          setError("Processing is taking too long. Please try again with a shorter video.")
-          setIsLoading(false)
-          return
-        }
-
-        console.log(`[UI] Poll attempt ${pollAttempts + 1}/${maxAttempts}`)
-        
-        const response = await fetch("/api/poll-result", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ poll_url: pollUrl }),
-        })
-
-        const result = await response.json()
-        console.log("[UI] Poll result:", result)
-
-        if (result.status === 'completed') {
-          // Clear polling interval
-          if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current)
-            pollIntervalRef.current = null
-          }
-
-          if (result.prediction && result.confidence !== undefined) {
-            setClassification(result.prediction)
-            setConfidence(result.confidence)
-            setProcessingStage("Analysis complete!")
-          } else {
-            setError("Invalid response format from server.")
-          }
-          setIsLoading(false)
-        } else if (result.status === 'processing') {
-          // Update processing stage based on attempts
-          if (pollAttempts < 6) {
-            setProcessingStage("Uploading and initializing...")
-          } else if (pollAttempts < 12) {
-            setProcessingStage("Extracting video frames...")
-          } else if (pollAttempts < 30) {
-            setProcessingStage("Analyzing frames with AI model...")
-          } else {
-            setProcessingStage("Finalizing analysis...")
-          }
-          // Continue polling
-        } else {
-          // Error case
-          if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current)
-            pollIntervalRef.current = null
-          }
-          setError(result.message || "Processing failed.")
-          setIsLoading(false)
-        }
-      } catch (err) {
-        console.error("[UI] Polling error:", err)
-        if (pollAttempts >= 3) { // Allow a few retry attempts
-          if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current)
-            pollIntervalRef.current = null
-          }
-          setError("Connection error during processing. Please try again.")
-          setIsLoading(false)
-        }
-      }
-    }
-
-    // Start polling
-    pollIntervalRef.current = setInterval(poll, pollInterval)
-    // Also call immediately
-    await poll()
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     console.log("[UI] handleSubmit start")
@@ -161,8 +72,6 @@ export default function VideoUpload() {
     setClassification(null)
     setConfidence(null)
     setError(null)
-    setProcessingStage("Uploading video...")
-    setPollAttempts(0)
 
     try {
       const filePath = `skintegrityvideos/${video.name}`
@@ -176,7 +85,6 @@ export default function VideoUpload() {
       if (uploadError) {
         console.error("[UI] Supabase upload error:", uploadError)
         setError("Failed to upload video to Supabase.")
-        setIsLoading(false)
         return
       }
 
@@ -185,93 +93,65 @@ export default function VideoUpload() {
 
       if (!data?.publicUrl) {
         setError("Failed to retrieve video URL.")
-        setIsLoading(false)
         return
       }
 
-      setProcessingStage("Sending to AI processor...")
       console.log("[UI] Calling local API /api/process-video")
-      
       const response = await fetch("/api/process-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ video_url: data.publicUrl }),
       })
-      
       console.log("[UI] API responded with status", response.status)
 
       if (!response.ok) {
         const errText = await response.text()
         console.error("[UI] API error body:", errText)
         setError(`API error: ${errText}`)
-        setIsLoading(false)
       } else {
         const result = await response.json()
-        console.log("[UI] Initial response:", result)
 
         if (result.status === 'error') {
           console.log("------------- error detected -------------")
           console.error("[UI] Backend error:", result.message)
-          setError(result.message || "An unexpected error occurred.")
-          setIsLoading(false)
-        } else if (result.status === 'success' || result.status === 'completed') {
-          // Immediate success
+          setError("An unexpected error occurred.")
+        } else if (result.status === 'success') {
           setClassification(result.prediction)
           setConfidence(result.confidence)
-          setIsLoading(false)
-        } else if (result.status === 'processing' && result.poll_url) {
-          // Start client-side polling
-          await pollForResult(result.poll_url)
         } else {
           setError("Unexpected response format from server.")
-          setIsLoading(false)
         }
       }
 
     } catch (err) {
       console.error("[UI] Unexpected error:", err)
       setError("An unexpected error occurred.")
-      setIsLoading(false)
     } finally {
-      // Clean up polling if still active
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current)
-        pollIntervalRef.current = null
-      }
-      
-      // Clean up Supabase video
-      if (video) {
-        console.log("[UI] Deleting video from Supabase")
-        const { error: delError } = await supabase
-          .storage
-          .from("videos")
-          .remove([`skintegrityvideos/${video.name}`])
+      setIsLoading(false)
+      console.log("[UI] Deleting video from Supabase")
+      const { error: delError } = await supabase
+        .storage
+        .from("videos")
+        .remove([`skintegrityvideos/${video.name}`])
 
-        if (delError) {
-          console.error("[UI] Supabase delete error:", delError)
-        } else {
-          console.log("[UI] Video deleted successfully")
+      if (delError) {
+        console.error("[UI] Supabase delete error:", delError)
+        // Don't overwrite existing errors with deletion errors
+        if (!error) {
+          setError("Failed to delete video.")
         }
+      } else {
+        console.log("[UI] Video deleted successfully")
       }
     }
   }
 
   const resetForm = () => {
-    // Clear any active polling
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current)
-      pollIntervalRef.current = null
-    }
-    
     setVideo(null)
     setVideoPreview(null)
     setClassification(null)
     setConfidence(null)
     setError(null)
-    setProcessingStage("")
-    setPollAttempts(0)
-    setIsLoading(false)
-    
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -288,6 +168,42 @@ export default function VideoUpload() {
     }
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
   }
+
+
+  const VideoContainer = ({ src, controls = false, showCloseButton = false, onClose }: {
+    src: string
+    controls?: boolean
+    showCloseButton?: boolean
+    onClose?: () => void
+  }) => (
+    <div className="relative w-full flex justify-center">
+      <div className="relative max-w-full max-h-96 bg-black rounded-lg overflow-hidden">
+        <video
+          ref={controls ? videoRef : undefined}
+          src={src}
+          className="w-full h-full max-w-none"
+          controls={controls}
+          style={{ 
+            maxHeight: '24rem', // max-h-96 equivalent
+            width: 'auto',
+            height: 'auto'
+          }}
+        />
+        {showCloseButton && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onClose?.()
+            }}
+            className="absolute top-2 right-2 bg-black/70 text-white p-1 rounded-full hover:bg-black/90 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        )}
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -315,30 +231,16 @@ export default function VideoUpload() {
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
-                    onClick={() => !isLoading && fileInputRef.current?.click()}
+                    onClick={() => fileInputRef.current?.click()}
                   >
                     {videoPreview ? (
-                      <div className="w-full">
-                        <div className="relative aspect-video w-full max-w-lg mx-auto mb-4">
-                          <video
-                            ref={videoRef}
-                            src={videoPreview}
-                            className="w-full h-full rounded-lg object-cover"
-                            controls
-                          />
-                          {!isLoading && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                resetForm()
-                              }}
-                              className="absolute top-2 right-2 bg-black/70 text-white p-1 rounded-full"
-                            >
-                              <X size={16} />
-                            </button>
-                          )}
-                        </div>
+                      <div className="w-full space-y-4">
+                        <VideoContainer 
+                          src={videoPreview} 
+                          controls={true}
+                          showCloseButton={true}
+                          onClose={resetForm}
+                        />
                         <p className="text-green-600 dark:text-green-400 text-center font-medium">{video?.name}</p>
                       </div>
                     ) : (
@@ -355,26 +257,8 @@ export default function VideoUpload() {
                       accept="video/*"
                       onChange={handleFileInputChange}
                       className="hidden"
-                      disabled={isLoading}
                     />
                   </div>
-
-                  {/* Processing Status */}
-                  {isLoading && processingStage && (
-                    <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                      <div className="flex items-center">
-                        <Loader2 className="animate-spin text-blue-600 mr-3" size={18} />
-                        <div className="flex-1">
-                          <p className="text-blue-600 dark:text-blue-400 font-medium">{processingStage}</p>
-                          {pollAttempts > 0 && (
-                            <p className="text-blue-500 dark:text-blue-300 text-sm mt-1">
-                              Processing attempt {pollAttempts}/60 (this may take a few minutes)
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
                   {error && (
                     <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start">
@@ -403,14 +287,14 @@ export default function VideoUpload() {
               </div>
             ) : (
               <div className="p-6 md:p-8">
-                <div className="flex flex-col md:flex-row gap-8">
-                  <div className="md:w-1/2">
+                <div className="flex flex-col lg:flex-row gap-8">
+                  <div className="lg:w-1/2">
                     {videoPreview && (
-                      <div className="aspect-video w-full mb-4">
-                        <video src={videoPreview} className="w-full h-full rounded-lg object-cover" controls />
+                      <div className="mb-4">
+                        <VideoContainer src={videoPreview} controls={true} />
                       </div>
                     )}
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                    <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
                       <p>
                         <strong>Filename:</strong> {video?.name}
                       </p>
@@ -420,7 +304,7 @@ export default function VideoUpload() {
                     </div>
                   </div>
 
-                  <div className="md:w-1/2">
+                  <div className="lg:w-1/2">
                     <div
                       className={`p-6 rounded-lg border ${
                         classification === "REAL"
@@ -443,7 +327,7 @@ export default function VideoUpload() {
                         <p className="text-gray-700 dark:text-gray-300 mb-2">Confidence Score:</p>
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
                           <div
-                            className={`h-4 rounded-full ${
+                            className={`h-4 rounded-full transition-all duration-300 ${
                               classification === "REAL" ? "bg-green-600" : "bg-red-600"
                             }`}
                             style={{ width: `${confidence ? (confidence * 100).toFixed(1) : 0}%` }}
@@ -499,7 +383,7 @@ export default function VideoUpload() {
                   </div>
                   <h3 className="font-medium mb-2">Result Generation</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                     confidence scores calculated by our predicer model
+                    Confidence scores calculated by our predictor model
                   </p>
                 </div>
               </div>

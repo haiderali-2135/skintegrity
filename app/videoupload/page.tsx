@@ -17,7 +17,6 @@ export default function VideoUpload() {
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
-
   
   const hasResult = classification !== null && confidence !== null
 
@@ -72,7 +71,7 @@ export default function VideoUpload() {
     setClassification(null)
     setConfidence(null)
     setError(null)
-
+    let dataUrl: string | null = null;
     try {
      // 1. Upload to Supabase
 const filePath = `skintegrityvideos/${video.name}`;
@@ -91,9 +90,11 @@ if (uploadError) {
 
 // 2. Get public URL
 const { data } = supabase.storage.from("videos").getPublicUrl(filePath);
-console.log("[UI] Supabase public URL:", data);
+dataUrl = data?.publicUrl ?? null;
 
-if (!data?.publicUrl) {
+console.log("[UI] Supabase public URL:", dataUrl);
+
+if (!dataUrl) {
   setError("Failed to retrieve video URL.");
   return;
 }
@@ -125,14 +126,25 @@ if (!response.ok) {
   return;
 }
 
+
 // 5. Start polling Supabase table by video_url
 let pollAttempts = 0;
 const maxAttempts = 120;
-const pollInterval = 5000;
+const pollInterval = 7000;
+      
+const sizeMB = video.size / (1024 * 1024); // Convert bytes to MB
+
+// 🧠 Dynamic wait: starts at 30s + 30s/MB, capped at 3 minutes
+const waitTime = Math.min(20000 + sizeMB * 20000, 240000); 
+
+console.log(`[UI] Video size: ${sizeMB.toFixed(2)} MB — waiting ${Math.round(waitTime / 1000)}s before polling...`);
+
+await new Promise((res) => setTimeout(res, waitTime));
 
 while (pollAttempts < maxAttempts) {
   pollAttempts++;
-
+  console.log("poll Attempt: ",pollAttempts);
+  
   const { data: row, error: pollError } = await supabase
     .from("video_results")
     .select("status, prediction, confidence")
@@ -156,10 +168,10 @@ while (pollAttempts < maxAttempts) {
   }
 
   if (row?.status === "failed") {
-    console.error("[UI] Video processing failed.");
-    setError("Video processing failed.");
-    break;
-  }
+  console.error("[UI] Video processing failed.");
+  setError("Video processing failed. Please try another video.");
+  break;
+}
 
   await new Promise((res) => setTimeout(res, pollInterval));
 }
@@ -184,7 +196,7 @@ if (pollAttempts >= maxAttempts) {
           setClassification(result.prediction)
           setConfidence(result.confidence)
         } else {
-          setError("Unexpected response format from server.")
+          setError("Video processing failed. Please try another video.")
         }
       }
 
@@ -192,22 +204,32 @@ if (pollAttempts >= maxAttempts) {
       console.error("[UI] Unexpected error:", err)
       setError("An unexpected error occurred.")
     } finally {
-      setIsLoading(false)
-      console.log("[UI] Deleting video from Supabase")
-      const { error: delError } = await supabase
-        .storage
-        .from("videos")
-        .remove([`skintegrityvideos/${video.name}`])
+       setIsLoading(false);
+  console.log("[UI] Cleaning up Supabase storage and table entry");
 
-      if (delError) {
-        console.error("[UI] Supabase delete error:", delError)
-        // Don't overwrite existing errors with deletion errors
-        if (!error) {
-          setError("Failed to delete video.")
-        }
-      } else {
-        console.log("[UI] Video deleted successfully")
-      }
+  const videoPath = `skintegrityvideos/${video.name}`;
+
+  // 🔴 DELETE video file
+  const { error: delError } = await supabase.storage.from("videos").remove([videoPath]);
+  if (delError) {
+    console.error("[UI] Supabase delete video error:", delError);
+    if (!error) setError("Failed to delete video file.");
+  } else {
+    console.log("[UI] Video file deleted successfully.");
+  }
+
+  // 🔴 DELETE DB entry
+  const { error: dbDeleteError } = await supabase
+    .from("video_results")
+    .delete()
+    .eq("video_url", dataUrl);;
+
+  if (dbDeleteError) {
+    console.error("[UI] Supabase delete DB row error:", dbDeleteError);
+    if (!error) setError("Failed to delete result record.");
+  } else {
+    console.log("[UI] Supabase table row deleted successfully.");
+  }
     }
   }
 
